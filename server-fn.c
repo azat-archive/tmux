@@ -361,6 +361,9 @@ server_destroy_pane(struct window_pane *wp)
 
 	old_fd = wp->fd;
 	if (wp->fd != -1) {
+#ifdef HAVE_UTEMPTER
+		utempter_remove_record(wp->fd);
+#endif
 		bufferevent_free(wp->event);
 		close(wp->fd);
 		wp->fd = -1;
@@ -454,7 +457,7 @@ server_destroy_session(struct session *s)
 }
 
 void
-server_check_unattached (void)
+server_check_unattached(void)
 {
 	struct session	*s;
 
@@ -480,7 +483,7 @@ server_set_identify(struct client *c)
 	tv.tv_sec = delay / 1000;
 	tv.tv_usec = (delay % 1000) * 1000L;
 
-	if (event_initialized (&c->identify_timer))
+	if (event_initialized(&c->identify_timer))
 		evtimer_del(&c->identify_timer);
 	evtimer_set(&c->identify_timer, server_callback_identify, c);
 	evtimer_add(&c->identify_timer, &tv);
@@ -592,7 +595,7 @@ server_set_stdin_callback(struct client *c, void (*cb)(struct client *, int,
 	c->references++;
 
 	if (c->stdin_closed)
-		c->stdin_callback (c, 1, c->stdin_callback_data);
+		c->stdin_callback(c, 1, c->stdin_callback_data);
 
 	server_write_client(c, MSG_STDIN, NULL, 0);
 

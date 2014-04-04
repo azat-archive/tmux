@@ -130,8 +130,10 @@ paste_replace(struct paste_stack *ps, u_int idx, char *data, size_t size)
 {
 	struct paste_buffer	*pb;
 
-	if (size == 0)
+	if (size == 0) {
+		free(data);
 		return (0);
+	}
 
 	if (idx >= ARRAY_LENGTH(ps))
 		return (-1);
@@ -169,7 +171,7 @@ paste_print(struct paste_buffer *pb, size_t width)
 
 /* Paste into a window pane, filtering '\n' according to separator. */
 void
-paste_send_pane (struct paste_buffer *pb, struct window_pane *wp,
+paste_send_pane(struct paste_buffer *pb, struct window_pane *wp,
     const char *sep, int bracket)
 {
 	const char	*data = pb->data, *end = data + pb->size, *lf;

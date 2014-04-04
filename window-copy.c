@@ -58,6 +58,7 @@ void	window_copy_copy_buffer(struct window_pane *, int, void *, size_t);
 void	window_copy_copy_pipe(
 	    struct window_pane *, struct session *, int, const char *);
 void	window_copy_copy_selection(struct window_pane *, int);
+void	window_copy_append_selection(struct window_pane *, int);
 void	window_copy_clear_selection(struct window_pane *);
 void	window_copy_copy_line(
 	    struct window_pane *, char **, size_t *, u_int, u_int, u_int);
@@ -414,6 +415,13 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 
 	cmd = mode_key_lookup(&data->mdata, key, &arg);
 	switch (cmd) {
+	case MODEKEYCOPY_APPENDSELECTION:
+		if (sess != NULL) {
+			window_copy_append_selection(wp, data->numprefix);
+			window_pane_reset_mode(wp);
+			return;
+		}
+		break;
 	case MODEKEYCOPY_CANCEL:
 		window_pane_reset_mode(wp);
 		return;
@@ -750,8 +758,10 @@ window_copy_key_input(struct window_pane *wp, int key)
 {
 	struct window_copy_mode_data	*data = wp->modedata;
 	struct screen			*s = &data->screen;
-	size_t				 inputlen;
+	size_t				 inputlen, n;
 	int				 np;
+	struct paste_buffer		*pb;
+	u_char				 ch;
 
 	switch (mode_key_lookup(&data->mdata, key, NULL)) {
 	case MODEKEYEDIT_CANCEL:
@@ -764,6 +774,20 @@ window_copy_key_input(struct window_pane *wp, int key)
 		break;
 	case MODEKEYEDIT_DELETELINE:
 		*data->inputstr = '\0';
+		break;
+	case MODEKEYEDIT_PASTE:
+		if ((pb = paste_get_top(&global_buffers)) == NULL)
+			break;
+		for (n = 0; n < pb->size; n++) {
+			ch = (u_char) pb->data[n];
+			if (ch < 32 || ch == 127)
+				break;
+		}
+		inputlen = strlen(data->inputstr);
+
+		data->inputstr = xrealloc(data->inputstr, 1, inputlen + n + 1);
+		memcpy(data->inputstr + inputlen, pb->data, n);
+		data->inputstr[inputlen + n] = '\0';
 		break;
 	case MODEKEYEDIT_ENTER:
 		np = data->numprefix;
@@ -853,8 +877,12 @@ window_copy_mouse(
 		} else if (m->wheel == MOUSE_WHEEL_DOWN) {
 			for (i = 0; i < 5; i++)
 				window_copy_cursor_down(wp, 1);
-			if (data->oy == 0)
-				goto reset_mode;
+			/*
+			 * We reached the bottom, leave copy mode,
+			 * but only if no selection is in progress.
+			 */
+			if (data->oy == 0 && !s->sel.flag)
+			    goto reset_mode;
 		}
 		return;
 	}
@@ -1030,7 +1058,7 @@ window_copy_search_up(struct window_pane *wp, const char *searchstr)
 
 	cis = 1;
 	for (ptr = searchstr; *ptr != '\0'; ptr++) {
-		if (*ptr != tolower(*ptr)) {
+		if (*ptr != tolower((u_char)*ptr)) {
 			cis = 0;
 			break;
 		}
@@ -1097,7 +1125,7 @@ window_copy_search_down(struct window_pane *wp, const char *searchstr)
 
 	cis = 1;
 	for (ptr = searchstr; *ptr != '\0'; ptr++) {
-		if (*ptr != tolower(*ptr)) {
+		if (*ptr != tolower((u_char)*ptr)) {
 			cis = 0;
 			break;
 		}
@@ -1150,10 +1178,10 @@ window_copy_write_line(
 	struct screen			*s = &data->screen;
 	struct options			*oo = &wp->window->options;
 	struct grid_cell		 gc;
-	char				 hdr[32];
-	size_t				 last, xoff = 0, size = 0;
+	char				 hdr[512];
+	size_t				 last, xoff = 0, size = 0, limit;
 
-	window_mode_attrs(&gc, oo);
+	style_apply(&gc, oo, "mode-style");
 
 	last = screen_size_y(s) - 1;
 	if (py == 0) {
@@ -1164,11 +1192,14 @@ window_copy_write_line(
 		screen_write_cursormove(ctx, screen_size_x(s) - size, 0);
 		screen_write_puts(ctx, &gc, "%s", hdr);
 	} else if (py == last && data->inputtype != WINDOW_COPY_OFF) {
+		limit = sizeof hdr;
+		if (limit > screen_size_x(s))
+			limit = screen_size_x(s);
 		if (data->inputtype == WINDOW_COPY_NUMERICPREFIX) {
-			xoff = size = xsnprintf(hdr, sizeof hdr,
+			xoff = size = xsnprintf(hdr, limit,
 			    "Repeat: %u", data->numprefix);
 		} else {
-			xoff = size = xsnprintf(hdr, sizeof hdr,
+			xoff = size = xsnprintf(hdr, limit,
 			    "%s: %s", data->inputprompt, data->inputstr);
 		}
 		screen_write_cursormove(ctx, 0, last);
@@ -1267,7 +1298,7 @@ window_copy_update_selection(struct window_pane *wp, int may_redraw)
 		return (0);
 
 	/* Set colours. */
-	window_mode_attrs(&gc, oo);
+	style_apply(&gc, oo, "mode-style");
 
 	/* Find top of screen. */
 	ty = screen_hsize(data->backing) - data->oy;
@@ -1432,8 +1463,8 @@ window_copy_copy_buffer(struct window_pane *wp, int idx, void *buf, size_t len)
 	if (idx == -1) {
 		limit = options_get_number(&global_options, "buffer-limit");
 		paste_add(&global_buffers, buf, len, limit);
-	} else
-		paste_replace(&global_buffers, idx, buf, len);
+	} else if (paste_replace(&global_buffers, idx, buf, len) != 0)
+		free(buf);
 }
 
 void
@@ -1466,6 +1497,46 @@ window_copy_copy_selection(struct window_pane *wp, int idx)
 		return;
 
 	window_copy_copy_buffer(wp, idx, buf, len);
+}
+
+void
+window_copy_append_selection(struct window_pane *wp, int idx)
+{
+	char			*buf;
+	struct paste_buffer	*pb;
+	size_t			 len;
+	u_int			 limit;
+	struct screen_write_ctx	 ctx;
+
+	buf = window_copy_get_selection(wp, &len);
+	if (buf == NULL)
+		return;
+
+	if (options_get_number(&global_options, "set-clipboard")) {
+		screen_write_start(&ctx, wp, NULL);
+		screen_write_setselection(&ctx, buf, len);
+		screen_write_stop(&ctx);
+	}
+
+	if (idx == -1)
+		idx = 0;
+
+	if (idx == 0 && paste_get_top(&global_buffers) == NULL) {
+		limit = options_get_number(&global_options, "buffer-limit");
+		paste_add(&global_buffers, buf, len, limit);
+		return;
+	}
+
+	pb = paste_get_index(&global_buffers, idx);
+	if (pb != NULL) {
+		buf = xrealloc(buf, 1, len + pb->size);
+		memmove(buf + pb->size, buf, len);
+		memcpy(buf, pb->data, pb->size);
+		len += pb->size;
+	}
+
+	if (paste_replace(&global_buffers, idx, buf, len) != 0)
+		free(buf);
 }
 
 void

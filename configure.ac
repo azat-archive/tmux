@@ -1,7 +1,7 @@
 # $Id$
 
 # Miscellaneous autofoo bullshit.
-AC_INIT(tmux, 1.9)
+AC_INIT(tmux, 1.10)
 
 AC_CONFIG_AUX_DIR(etc)
 AM_INIT_AUTOMAKE([foreign subdir-objects])
@@ -16,6 +16,7 @@ AC_CANONICAL_HOST
 # Set up the compiler in two different ways and say yes we may want to install.
 AC_PROG_CC
 AM_PROG_CC_C_O
+AC_PROG_MKDIR_P
 AC_PROG_INSTALL
 
 # Default tmux.conf goes in /etc not ${prefix}/etc.
@@ -141,6 +142,13 @@ AC_SEARCH_LIBS(
 )
 if test "x$found_curses" = xno; then
     AC_MSG_ERROR("curses not found")
+fi
+
+# Look for utempter.
+AC_CHECK_HEADER(utempter.h, have_utempter=yes, have_utempter=no)
+if test "x$have_utempter" = xyes; then
+   AC_DEFINE(HAVE_UTEMPTER)
+   LIBS="$LIBS -lutempter"
 fi
 
 # Check for b64_ntop.
@@ -492,6 +500,10 @@ case "$host_os" in
 	*hpux*)
 		AC_MSG_RESULT(hpux)
 		PLATFORM=hpux
+		;;
+	*cygwin*)
+		AC_MSG_RESULT(cygwin)
+		PLATFORM=cygwin
 		;;
 	*)
 		AC_MSG_RESULT(unknown)

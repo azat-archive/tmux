@@ -321,6 +321,13 @@ format_expand(struct format_tree *ft, const char *fmt)
 				break;
 			fmt += n + 1;
 			continue;
+		case '#':
+			while (len - off < 2) {
+				buf = xrealloc(buf, 2, len);
+				len *= 2;
+			}
+			buf[off++] = '#';
+			continue;
 		default:
 			s = NULL;
 			if (ch >= 'A' && ch <= 'Z')
@@ -394,10 +401,8 @@ format_session(struct format_tree *ft, struct session *s)
 	*strchr(tim, '\n') = '\0';
 	format_add(ft, "session_created_string", "%s", tim);
 
-	if (s->flags & SESSION_UNATTACHED)
-		format_add(ft, "session_attached", "%d", 0);
-	else
-		format_add(ft, "session_attached", "%d", 1);
+	format_add(ft, "session_attached", "%u", s->attached);
+	format_add(ft, "session_many_attached", "%u", s->attached > 1);
 }
 
 /* Set default format keys for a client. */

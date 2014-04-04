@@ -9,6 +9,7 @@ EXTRA_DIST = \
 	CHANGES FAQ README TODO COPYING examples compat \
 	array.h compat.h tmux.h osdep-*.c mdoc2man.awk tmux.1
 dist-hook:
+	make clean
 	grep "^#found_debug=" configure
 	find $(distdir) -name .svn -type d|xargs rm -Rf
 
@@ -66,7 +67,6 @@ dist_tmux_SOURCES = \
 	attributes.c \
 	cfg.c \
 	client.c \
-	clock.c \
 	cmd-attach-session.c \
 	cmd-bind-key.c \
 	cmd-break-pane.c \
@@ -122,7 +122,6 @@ dist_tmux_SOURCES = \
 	cmd-select-pane.c \
 	cmd-select-window.c \
 	cmd-send-keys.c \
-	cmd-server-info.c \
 	cmd-set-buffer.c \
 	cmd-set-environment.c \
 	cmd-set-option.c \
@@ -131,7 +130,6 @@ dist_tmux_SOURCES = \
 	cmd-show-options.c \
 	cmd-source-file.c \
 	cmd-split-window.c \
-	cmd-start-server.c \
 	cmd-string.c \
 	cmd-suspend-client.c \
 	cmd-swap-pane.c \
@@ -175,6 +173,7 @@ dist_tmux_SOURCES = \
 	session.c \
 	signal.c \
 	status.c \
+	style.c \
 	tmux.c \
 	tty-acs.c \
 	tty-keys.c \

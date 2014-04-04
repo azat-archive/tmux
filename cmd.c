@@ -125,9 +125,7 @@ struct session	*cmd_lookup_session(const char *, int *);
 struct session	*cmd_lookup_session_id(const char *);
 struct winlink	*cmd_lookup_window(struct session *, const char *, int *);
 int		 cmd_lookup_index(struct session *, const char *, int *);
-struct window_pane *cmd_lookup_paneid(const char *);
 struct winlink	*cmd_lookup_winlink_windowid(struct session *, const char *);
-struct window	*cmd_lookup_windowid(const char *);
 struct session	*cmd_window_session(struct cmd_q *, struct window *,
 		    struct winlink **);
 struct winlink	*cmd_find_window_offset(const char *, struct session *, int *);
@@ -139,6 +137,9 @@ cmd_pack_argv(int argc, char **argv, char *buf, size_t len)
 {
 	size_t	arglen;
 	int	i;
+
+	if (argc == 0)
+		return (0);
 
 	*buf = '\0';
 	for (i = 0; i < argc; i++) {

@@ -345,8 +345,7 @@ window_choose_collapse(struct window_pane *wp, struct session *s)
 	 * assign the actual result we want to render and copy the new one over
 	 * the top of it.
 	 */
-	for (i = 0; i < ARRAY_LENGTH(&data->list); i++)
-	{
+	for (i = 0; i < ARRAY_LENGTH(&data->list); i++) {
 		item = &ARRAY_ITEM(&data->list, i);
 		wcd = item->wcd;
 
@@ -680,6 +679,29 @@ window_choose_key(struct window_pane *wp, unused struct session *sess, int key)
 		window_choose_prompt_input(WINDOW_CHOOSE_GOTO_ITEM,
 		    "Goto Item", wp, key);
 		break;
+	case MODEKEYCHOICE_STARTOFLIST:
+		data->selected = 0;
+		data->top = 0;
+		window_choose_redraw_screen(wp);
+		break;
+	case MODEKEYCHOICE_TOPLINE:
+		data->selected = data->top;
+		window_choose_redraw_screen(wp);
+		break;
+	case MODEKEYCHOICE_BOTTOMLINE:
+		data->selected = data->top + screen_size_y(s) - 1;
+		if (data->selected > items - 1)
+			data->selected = items - 1;
+		window_choose_redraw_screen(wp);
+		break;
+	case MODEKEYCHOICE_ENDOFLIST:
+		data->selected = items - 1;
+		if (screen_size_y(s) < items)
+			data->top = items - screen_size_y(s);
+		else
+			data->top = 0;
+		window_choose_redraw_screen(wp);
+		break;
 	default:
 		idx = window_choose_index_key(data, key);
 		if (idx < 0 || (u_int) idx >= ARRAY_LENGTH(&data->list))
@@ -737,7 +759,7 @@ window_choose_write_line(
 	utf8flag = options_get_number(&wp->window->options, "utf8");
 	memcpy(&gc, &grid_default_cell, sizeof gc);
 	if (data->selected == data->top + py)
-		window_mode_attrs(&gc, oo);
+		style_apply(&gc, oo, "mode-style");
 
 	screen_write_cursormove(ctx, 0, py);
 	if (data->top + py  < ARRAY_LENGTH(&data->list)) {
@@ -764,7 +786,7 @@ window_choose_write_line(
 		screen_write_putc(ctx, &gc, ' ');
 
 	if (data->input_type != WINDOW_CHOOSE_NORMAL) {
-		window_mode_attrs(&gc, oo);
+		style_apply(&gc, oo, "mode-style");
 
 		xoff = xsnprintf(hdr, sizeof hdr,
 			"%s: %s", data->input_prompt, data->input_str);
