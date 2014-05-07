@@ -776,7 +776,7 @@ window_copy_key_input(struct window_pane *wp, int key)
 		*data->inputstr = '\0';
 		break;
 	case MODEKEYEDIT_PASTE:
-		if ((pb = paste_get_top(&global_buffers)) == NULL)
+		if ((pb = paste_get_top()) == NULL)
 			break;
 		for (n = 0; n < pb->size; n++) {
 			ch = (u_char) pb->data[n];
@@ -871,18 +871,19 @@ window_copy_mouse(
 
 	/* If mouse wheel (buttons 4 and 5), scroll. */
 	if (m->event == MOUSE_EVENT_WHEEL) {
-		if (m->wheel == MOUSE_WHEEL_UP) {
-			for (i = 0; i < 5; i++)
+		for (i = 0; i < m->scroll; i++) {
+			if (m->wheel == MOUSE_WHEEL_UP)
 				window_copy_cursor_up(wp, 1);
-		} else if (m->wheel == MOUSE_WHEEL_DOWN) {
-			for (i = 0; i < 5; i++)
+			else {
 				window_copy_cursor_down(wp, 1);
-			/*
-			 * We reached the bottom, leave copy mode,
-			 * but only if no selection is in progress.
-			 */
-			if (data->oy == 0 && !s->sel.flag)
-			    goto reset_mode;
+
+				/*
+				 * We reached the bottom, leave copy mode, but
+				 * only if no selection is in progress.
+				 */
+				if (data->oy == 0 && !s->sel.flag)
+					goto reset_mode;
+			}
 		}
 		return;
 	}
@@ -1193,8 +1194,8 @@ window_copy_write_line(
 		screen_write_puts(ctx, &gc, "%s", hdr);
 	} else if (py == last && data->inputtype != WINDOW_COPY_OFF) {
 		limit = sizeof hdr;
-		if (limit > screen_size_x(s))
-			limit = screen_size_x(s);
+		if (limit > screen_size_x(s) + 1)
+			limit = screen_size_x(s) + 1;
 		if (data->inputtype == WINDOW_COPY_NUMERICPREFIX) {
 			xoff = size = xsnprintf(hdr, limit,
 			    "Repeat: %u", data->numprefix);
@@ -1207,10 +1208,12 @@ window_copy_write_line(
 	} else
 		size = 0;
 
-	screen_write_cursormove(ctx, xoff, py);
-	screen_write_copy(ctx, data->backing, xoff,
-	    (screen_hsize(data->backing) - data->oy) + py,
-	    screen_size_x(s) - size, 1);
+	if (size < screen_size_x(s)) {
+		screen_write_cursormove(ctx, xoff, py);
+		screen_write_copy(ctx, data->backing, xoff,
+		    (screen_hsize(data->backing) - data->oy) + py,
+		    screen_size_x(s) - size, 1);
+	}
 
 	if (py == data->cy && data->cx == screen_size_x(s)) {
 		memcpy(&gc, &grid_default_cell, sizeof gc);
@@ -1462,8 +1465,8 @@ window_copy_copy_buffer(struct window_pane *wp, int idx, void *buf, size_t len)
 
 	if (idx == -1) {
 		limit = options_get_number(&global_options, "buffer-limit");
-		paste_add(&global_buffers, buf, len, limit);
-	} else if (paste_replace(&global_buffers, idx, buf, len) != 0)
+		paste_add(buf, len, limit);
+	} else if (paste_replace(idx, buf, len) != 0)
 		free(buf);
 }
 
@@ -1521,13 +1524,13 @@ window_copy_append_selection(struct window_pane *wp, int idx)
 	if (idx == -1)
 		idx = 0;
 
-	if (idx == 0 && paste_get_top(&global_buffers) == NULL) {
+	if (idx == 0 && paste_get_top() == NULL) {
 		limit = options_get_number(&global_options, "buffer-limit");
-		paste_add(&global_buffers, buf, len, limit);
+		paste_add(buf, len, limit);
 		return;
 	}
 
-	pb = paste_get_index(&global_buffers, idx);
+	pb = paste_get_index(idx);
 	if (pb != NULL) {
 		buf = xrealloc(buf, 1, len + pb->size);
 		memmove(buf + pb->size, buf, len);
@@ -1535,7 +1538,7 @@ window_copy_append_selection(struct window_pane *wp, int idx)
 		len += pb->size;
 	}
 
-	if (paste_replace(&global_buffers, idx, buf, len) != 0)
+	if (paste_replace(idx, buf, len) != 0)
 		free(buf);
 }
 
@@ -2030,7 +2033,8 @@ window_copy_cursor_next_word(struct window_pane *wp, const char *separators)
 }
 
 void
-window_copy_cursor_next_word_end(struct window_pane *wp, const char *separators)
+window_copy_cursor_next_word_end(struct window_pane *wp,
+    const char *separators)
 {
 	struct window_copy_mode_data	*data = wp->modedata;
 	struct options			*oo = &wp->window->options;
@@ -2081,7 +2085,8 @@ window_copy_cursor_next_word_end(struct window_pane *wp, const char *separators)
 
 /* Move to the previous place where a word begins. */
 void
-window_copy_cursor_previous_word(struct window_pane *wp, const char *separators)
+window_copy_cursor_previous_word(struct window_pane *wp,
+    const char *separators)
 {
 	struct window_copy_mode_data	*data = wp->modedata;
 	u_int				 px, py;

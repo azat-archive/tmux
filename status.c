@@ -396,9 +396,6 @@ status_replace1(struct client *c, char **iptr, char **optr, char *out,
 	case '{':
 		ptr = (char *) "#{";
 		goto do_replace;
-	case '#':
-		*(*optr)++ = '#';
-		break;
 	default:
 		xsnprintf(tmp, sizeof tmp, "#%c", *(*iptr - 1));
 		ptr = tmp;
@@ -641,8 +638,6 @@ status_print(
 
 	if (wl->flags & WINLINK_BELL)
 		style_apply_update(gc, oo, "window-status-bell-style");
-	else if (wl->flags & WINLINK_CONTENT)
-		style_apply_update(gc, oo, "window-status-content-style");
 	else if (wl->flags & (WINLINK_ACTIVITY|WINLINK_SILENCE))
 		style_apply_update(gc, oo, "window-status-activity-style");
 
@@ -1162,7 +1157,7 @@ status_prompt_key(struct client *c, int key)
 		c->flags |= CLIENT_STATUS;
 		break;
 	case MODEKEYEDIT_PASTE:
-		if ((pb = paste_get_top(&global_buffers)) == NULL)
+		if ((pb = paste_get_top()) == NULL)
 			break;
 		for (n = 0; n < pb->size; n++) {
 			ch = (u_char) pb->data[n];

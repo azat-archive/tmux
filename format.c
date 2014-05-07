@@ -194,10 +194,10 @@ int
 format_replace(struct format_tree *ft, const char *key, size_t keylen,
     char **buf, size_t *len, size_t *off)
 {
-	char		*copy, *copy0, *endptr, *ptr, *saved;
+	char		*copy, *copy0, *endptr, *ptr, *saved, *trimmed;
 	const char	*value;
 	size_t		 valuelen;
-	u_long		 limit = ULONG_MAX;
+	u_long		 limit = 0;
 
 	/* Make a copy of the key. */
 	copy0 = copy = xmalloc(keylen + 1);
@@ -256,11 +256,14 @@ format_replace(struct format_tree *ft, const char *key, size_t keylen,
 			value = "";
 		saved = NULL;
 	}
-	valuelen = strlen(value);
 
 	/* Truncate the value if needed. */
-	if (valuelen > limit)
-		valuelen = limit;
+	if (limit != 0) {
+		value = trimmed = utf8_trimcstr(value, limit);
+		free(saved);
+		saved = trimmed;
+	}
+	valuelen = strlen(value);
 
 	/* Expand the buffer and copy in the value. */
 	while (*len - *off < valuelen + 1) {
@@ -487,8 +490,6 @@ format_winlink(struct format_tree *ft, struct session *s, struct winlink *wl)
 
 	format_add(ft, "window_bell_flag", "%u",
 	    !!(wl->flags & WINLINK_BELL));
-	format_add(ft, "window_content_flag", "%u",
-	    !!(wl->flags & WINLINK_CONTENT));
 	format_add(ft, "window_activity_flag", "%u",
 	    !!(wl->flags & WINLINK_ACTIVITY));
 	format_add(ft, "window_silence_flag", "%u",
@@ -603,12 +604,14 @@ format_window_pane(struct format_tree *ft, struct window_pane *wp)
 
 /* Set default format keys for paste buffer. */
 void
-format_paste_buffer(struct format_tree *ft, struct paste_buffer *pb)
+format_paste_buffer(struct format_tree *ft, struct paste_buffer *pb,
+    int utf8flag)
 {
-	char	*pb_print = paste_print(pb, 50);
+	char	*s;
 
 	format_add(ft, "buffer_size", "%zu", pb->size);
-	format_add(ft, "buffer_sample", "%s", pb_print);
 
-	free(pb_print);
+	s = paste_make_sample(pb, utf8flag);
+	format_add(ft, "buffer_sample", "%s", s);
+	free(s);
 }

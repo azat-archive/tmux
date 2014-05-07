@@ -308,7 +308,7 @@ tty_term_override(struct tty_term *term, const char *overrides)
 }
 
 struct tty_term *
-tty_term_find(char *name, int fd, const char *overrides, char **cause)
+tty_term_find(char *name, int fd, char **cause)
 {
 	struct tty_term				*term;
 	const struct tty_term_code_entry	*ent;
@@ -386,7 +386,10 @@ tty_term_find(char *name, int fd, const char *overrides, char **cause)
 			break;
 		}
 	}
-	tty_term_override(term, overrides);
+
+	/* Apply terminal overrides. */
+	s = options_get_string(&global_options, "terminal-overrides");
+	tty_term_override(term, s);
 
 	/* Delete curses data. */
 #if !defined(NCURSES_VERSION_MAJOR) || NCURSES_VERSION_MAJOR > 5 || \
@@ -509,7 +512,8 @@ tty_term_ptr1(struct tty_term *term, enum tty_code_code code, const void *a)
 }
 
 const char *
-tty_term_ptr2(struct tty_term *term, enum tty_code_code code, const void *a, const void *b)
+tty_term_ptr2(struct tty_term *term, enum tty_code_code code, const void *a,
+    const void *b)
 {
 	return (tparm((char *) tty_term_string(term, code), a, b, 0, 0, 0, 0, 0, 0, 0));
 }
