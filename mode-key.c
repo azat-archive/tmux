@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2008 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -130,6 +130,7 @@ const struct mode_key_cmdstr mode_key_cmdstr_copy[] = {
 	{ MODEKEYCOPY_NEXTSPACEEND, "next-space-end" },
 	{ MODEKEYCOPY_NEXTWORD, "next-word" },
 	{ MODEKEYCOPY_NEXTWORDEND, "next-word-end" },
+	{ MODEKEYCOPY_OTHEREND, "other-end" },
 	{ MODEKEYCOPY_PREVIOUSPAGE, "page-up" },
 	{ MODEKEYCOPY_PREVIOUSSPACE, "previous-space" },
 	{ MODEKEYCOPY_PREVIOUSWORD, "previous-word" },
@@ -141,6 +142,7 @@ const struct mode_key_cmdstr mode_key_cmdstr_copy[] = {
 	{ MODEKEYCOPY_SEARCHREVERSE, "search-reverse" },
 	{ MODEKEYCOPY_SEARCHUP, "search-backward" },
 	{ MODEKEYCOPY_SELECTLINE, "select-line" },
+	{ MODEKEYCOPY_STARTNAMEDBUFFER, "start-named-buffer" },
 	{ MODEKEYCOPY_STARTNUMBERPREFIX, "start-number-prefix" },
 	{ MODEKEYCOPY_STARTOFLINE, "start-of-line" },
 	{ MODEKEYCOPY_STARTSELECTION, "begin-selection" },
@@ -257,6 +259,7 @@ struct mode_key_tree mode_key_tree_vi_choice;
 /* vi copy mode keys. */
 const struct mode_key_entry mode_key_vi_copy[] = {
 	{ ' ',			    0, MODEKEYCOPY_STARTSELECTION },
+	{ '"',			    0, MODEKEYCOPY_STARTNAMEDBUFFER },
 	{ '$',			    0, MODEKEYCOPY_ENDOFLINE },
 	{ ',',			    0, MODEKEYCOPY_JUMPREVERSE },
 	{ ';',			    0, MODEKEYCOPY_JUMPAGAIN },
@@ -286,6 +289,7 @@ const struct mode_key_entry mode_key_vi_copy[] = {
 	{ 'M',			    0, MODEKEYCOPY_MIDDLELINE },
 	{ 'N',			    0, MODEKEYCOPY_SEARCHREVERSE },
 	{ 'T',			    0, MODEKEYCOPY_JUMPTOBACK },
+	{ 'V',			    0, MODEKEYCOPY_SELECTLINE },
 	{ 'W',			    0, MODEKEYCOPY_NEXTSPACE },
 	{ '\002' /* C-b */,	    0, MODEKEYCOPY_PREVIOUSPAGE },
 	{ '\003' /* C-c */,	    0, MODEKEYCOPY_CANCEL },

@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -16,7 +16,7 @@
  * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 
 #include <event.h>
@@ -50,7 +50,7 @@ osdep_get_name(int fd, unused char *tty)
 	while ((ch = fgetc(f)) != EOF) {
 		if (ch == '\0')
 			break;
-		buf = xrealloc(buf, 1, len + 2);
+		buf = xrealloc(buf, len + 2);
 		buf[len++] = ch;
 	}
 	if (buf != NULL)

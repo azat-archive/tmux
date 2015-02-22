@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -24,7 +24,7 @@
 #include "tmux.h"
 
 struct cmd_list *
-cmd_list_parse(int argc, char **argv, const char* file, u_int line,
+cmd_list_parse(int argc, char **argv, const char *file, u_int line,
     char **cause)
 {
 	struct cmd_list	*cmdlist;
