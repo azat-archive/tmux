@@ -118,9 +118,9 @@ status_redraw_get_right(struct client *c, time_t t, int utf8flag,
 	return (right);
 }
 
-/* Set window at window list position. */
-void
-status_set_window_at(struct client *c, u_int x)
+/* Get window at window list position. */
+struct window *
+status_get_window_at(struct client *c, u_int x)
 {
 	struct session	*s = c->session;
 	struct winlink	*wl;
@@ -130,12 +130,13 @@ status_set_window_at(struct client *c, u_int x)
 	x += c->wlmouse;
 	RB_FOREACH(wl, winlinks, &s->windows) {
 		oo = &wl->window->options;
-
 		len = strlen(options_get_string(oo, "window-status-separator"));
-		if (x < wl->status_width && session_select(s, wl->idx) == 0)
-			server_redraw_session(s);
+
+		if (x < wl->status_width)
+			return (wl->window);
 		x -= wl->status_width + len;
 	}
+	return (NULL);
 }
 
 /* Draw status for client on the last lines of given context. */
@@ -514,7 +515,7 @@ status_find_job(struct client *c, char **iptr)
 
 	/* If not found at all, start the job and add to the tree. */
 	if (so == NULL) {
-		job_run(cmd, NULL, status_job_callback, status_job_free, c);
+		job_run(cmd, NULL, -1, status_job_callback, status_job_free, c);
 		c->references++;
 
 		so = xmalloc(sizeof *so);
@@ -635,10 +636,12 @@ void
 status_message_set(struct client *c, const char *fmt, ...)
 {
 	struct timeval		 tv;
-	struct message_entry	*msg;
+	struct message_entry	*msg, *msg1;
 	va_list			 ap;
 	int			 delay;
-	u_int			 i, limit;
+	u_int			 first, limit;
+
+	limit = options_get_number(&global_options, "message-limit");
 
 	status_prompt_clear(c);
 	status_message_clear(c);
@@ -647,19 +650,19 @@ status_message_set(struct client *c, const char *fmt, ...)
 	xvasprintf(&c->message_string, fmt, ap);
 	va_end(ap);
 
-	ARRAY_EXPAND(&c->message_log, 1);
-	msg = &ARRAY_LAST(&c->message_log);
+	msg = xcalloc(1, sizeof *msg);
 	msg->msg_time = time(NULL);
+	msg->msg_num = c->message_next++;
 	msg->msg = xstrdup(c->message_string);
+	TAILQ_INSERT_TAIL(&c->message_log, msg, entry);
 
-	limit = options_get_number(&global_options, "message-limit");
-	if (ARRAY_LENGTH(&c->message_log) > limit) {
-		limit = ARRAY_LENGTH(&c->message_log) - limit;
-		for (i = 0; i < limit; i++) {
-			msg = &ARRAY_FIRST(&c->message_log);
-			free(msg->msg);
-			ARRAY_REMOVE(&c->message_log, 0);
-		}
+	first = c->message_next - limit;
+	TAILQ_FOREACH_SAFE(msg, &c->message_log, entry, msg1) {
+		if (msg->msg_num >= first)
+			continue;
+		free(msg->msg);
+		TAILQ_REMOVE(&c->message_log, msg, entry);
+		free(msg);
 	}
 
 	delay = options_get_number(&c->session->options, "display-time");

@@ -35,9 +35,6 @@
 const char *options_table_mode_keys_list[] = {
 	"emacs", "vi", NULL
 };
-const char *options_table_mode_mouse_list[] = {
-	"off", "on", "copy-mode", NULL
-};
 const char *options_table_clock_mode_style_list[] = {
 	"12", "24", NULL
 };
@@ -61,6 +58,11 @@ const struct options_table_entry server_options_table[] = {
 	  .minimum = 1,
 	  .maximum = INT_MAX,
 	  .default_num = 20
+	},
+
+	{ .name = "default-terminal",
+	  .type = OPTIONS_TABLE_STRING,
+	  .default_str = "screen"
 	},
 
 	{ .name = "escape-time",
@@ -143,11 +145,6 @@ const struct options_table_entry session_options_table[] = {
 	{ .name = "default-shell",
 	  .type = OPTIONS_TABLE_STRING,
 	  .default_str = _PATH_BSHELL
-	},
-
-	{ .name = "default-terminal",
-	  .type = OPTIONS_TABLE_STRING,
-	  .default_str = "screen"
 	},
 
 	{ .name = "destroy-unattached",
@@ -254,17 +251,7 @@ const struct options_table_entry session_options_table[] = {
 	  .default_str = "bg=yellow,fg=black"
 	},
 
-	{ .name = "mouse-resize-pane",
-	  .type = OPTIONS_TABLE_FLAG,
-	  .default_num = 0
-	},
-
-	{ .name = "mouse-select-pane",
-	  .type = OPTIONS_TABLE_FLAG,
-	  .default_num = 0
-	},
-
-	{ .name = "mouse-select-window",
+	{ .name = "mouse",
 	  .type = OPTIONS_TABLE_FLAG,
 	  .default_num = 0
 	},
@@ -574,12 +561,6 @@ const struct options_table_entry window_options_table[] = {
 	  .default_num = MODEKEY_EMACS
 	},
 
-	{ .name = "mode-mouse",
-	  .type = OPTIONS_TABLE_CHOICE,
-	  .choices = options_table_mode_mouse_list,
-	  .default_num = 0
-	},
-
 	{ .name = "mode-style",
 	  .type = OPTIONS_TABLE_STYLE,
 	  .default_str = "bg=yellow,fg=black"
@@ -667,6 +648,16 @@ const struct options_table_entry window_options_table[] = {
 	  .default_num = 0 /* overridden in main() */
 	},
 
+	{ .name = "window-active-style",
+	  .type = OPTIONS_TABLE_STYLE,
+	  .default_str = "default"
+	},
+
+	{ .name = "window-style",
+	  .type = OPTIONS_TABLE_STYLE,
+	  .default_str = "default"
+	},
+
 	{ .name = "window-status-activity-attr",
 	  .type = OPTIONS_TABLE_ATTRIBUTES,
 	  .default_num = GRID_ATTR_REVERSE,
@@ -745,7 +736,7 @@ const struct options_table_entry window_options_table[] = {
 
 	{ .name = "window-status-current-format",
 	  .type = OPTIONS_TABLE_STRING,
-	  .default_str = "#I:#W#F"
+	  .default_str = "#I:#W#{?window_flags,#{window_flags}, }"
 	},
 
 	{ .name = "window-status-current-style",
@@ -761,7 +752,7 @@ const struct options_table_entry window_options_table[] = {
 
 	{ .name = "window-status-format",
 	  .type = OPTIONS_TABLE_STRING,
-	  .default_str = "#I:#W#F"
+	  .default_str = "#I:#W#{?window_flags,#{window_flags}, }"
 	},
 
 	{ .name = "window-status-last-attr",

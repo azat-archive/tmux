@@ -80,6 +80,7 @@ dist_tmux_SOURCES = \
 	cmd-detach-client.c \
 	cmd-display-message.c \
 	cmd-display-panes.c \
+	cmd-find.c \
 	cmd-find-window.c \
 	cmd-if-shell.c \
 	cmd-join-pane.c \
@@ -251,6 +252,7 @@ install-exec-hook:
 # Update SF web site.
 upload-index.html: update-index.html
 	scp www/index.html www/main.css www/images/*.png \
+		www/logo.png www/favicon.ico \
 		${USER},tmux@web.sf.net:/home/groups/t/tm/tmux/htdocs
 	rm -f www/index.html www/images/small-*
 
@@ -258,7 +260,10 @@ update-index.html:
 	(cd www/images && \
 		rm -f small-* && \
 		for i in *.png; do \
-			convert "$$i" -resize 200x150 "small-$$i"; \
+			convert "$$i" \
+				-resize '150x' -resize 'x100<' \
+				-gravity center -crop 150x100+0+0 +repage \
+				"small-$$i"; \
 		done \
 	)
 	sed "s/%%RELEASE%%/${RELEASE}/g" www/index.html.in >www/index.html

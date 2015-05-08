@@ -69,6 +69,22 @@ session_find(const char *name)
 	return (RB_FIND(sessions, &sessions, &s));
 }
 
+/* Find session by id parsed from a string. */
+struct session *
+session_find_by_id_str(const char *s)
+{
+	const char	*errstr;
+	u_int		 id;
+
+	if (*s != '$')
+		return (NULL);
+
+	id = strtonum(s + 1, 0, UINT_MAX, &errstr);
+	if (errstr != NULL)
+		return (NULL);
+	return (session_find_by_id(id));
+}
+
 /* Find session by id. */
 struct session *
 session_find_by_id(u_int id)
@@ -308,16 +324,30 @@ session_detach(struct session *s, struct winlink *wl)
 }
 
 /* Return if session has window. */
-struct winlink *
+int
 session_has(struct session *s, struct window *w)
 {
 	struct winlink	*wl;
 
 	RB_FOREACH(wl, winlinks, &s->windows) {
 		if (wl->window == w)
-			return (wl);
+			return (1);
 	}
-	return (NULL);
+	return (0);
+}
+
+/*
+ * Return 1 if a window is linked outside this session (not including session
+ * groups). The window must be in this session!
+ */
+int
+session_is_linked(struct session *s, struct window *w)
+{
+	struct session_group	*sg;
+
+	if ((sg = session_group_find(s)) != NULL)
+		return (w->references != session_group_count(sg));
+	return (w->references != 1);
 }
 
 struct winlink *
