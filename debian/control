@@ -1,15 +1,19 @@
 Source: tmux
-Section: unknown
+Section: admin
 Priority: optional
 Maintainer: Azat Khuzhin <a3at.mail@gmail.com>
-Build-Depends: debhelper (>= 9), autotools-dev
+Build-Depends: debhelper (>= 9), autotools-dev,
+               dpkg-dev (>= 1.16.1~),
+               libncurses5-dev,
+               libevent-dev (>> 2.0.10),
+               pkg-config,
+               dh-autoreconf,
 Standards-Version: 3.9.5
-Homepage: <insert the upstream URL, if relevant>
+Homepage: http://tmux.sourceforge.net/
 #Vcs-Git: git://anonscm.debian.org/collab-maint/tmux.git
 #Vcs-Browser: http://anonscm.debian.org/?p=collab-maint/tmux.git;a=summary
 
 Package: tmux
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Description: terminal multiplexer
