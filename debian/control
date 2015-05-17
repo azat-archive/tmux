@@ -1,0 +1,15 @@
+Source: tmux
+Section: unknown
+Priority: optional
+Maintainer: Azat Khuzhin <a3at.mail@gmail.com>
+Build-Depends: debhelper (>= 9), autotools-dev
+Standards-Version: 3.9.5
+Homepage: <insert the upstream URL, if relevant>
+#Vcs-Git: git://anonscm.debian.org/collab-maint/tmux.git
+#Vcs-Browser: http://anonscm.debian.org/?p=collab-maint/tmux.git;a=summary
+
+Package: tmux
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: <insert up to 60 chars description>
+ <insert long description, indented with spaces>

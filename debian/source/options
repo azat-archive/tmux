@@ -1,0 +1,32 @@
+tar-ignore = ".svn/*"
+tar-ignore = ".git/*"
+
+# export .git/info/exclude
+tar-ignore = "*.log"
+tar-ignore = "*.invest*/*"
+tar-ignore = "tmux-1.6"
+
+# export .gitignore
+tar-ignore = ".pc"
+tar-ignore = "*.o"
+tar-ignore = "*~"
+tar-ignore = "*.diff"
+tar-ignore = "*.patch"
+tar-ignore = "*.core"
+tar-ignore = "core"
+tar-ignore = "tags"
+tar-ignore = ".deps/*"
+tar-ignore = "compat/.dirstamp"
+tar-ignore = "aclocal.m4"
+tar-ignore = "autom4te.cache/*"
+tar-ignore = "config.log"
+tar-ignore = "config.status"
+tar-ignore = "etc/*"
+tar-ignore = "tmux"
+tar-ignore = "Makefile"
+tar-ignore = "Makefile.in"
+tar-ignore = "configure"
+tar-ignore = "tmux.1.*"
+
+# ignore changes on config.{sub,guess}
+extend-diff-ignore = "(^|/)(config.sub|config.guess)$"
