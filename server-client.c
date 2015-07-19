@@ -30,6 +30,7 @@
 #include "tmux.h"
 
 void	server_client_key_table(struct client *, const char *);
+void	server_client_free(int, short, void *);
 void	server_client_check_focus(struct window_pane *);
 void	server_client_check_resize(struct window_pane *);
 int	server_client_check_mouse(struct client *);
@@ -44,6 +45,27 @@ int	server_client_msg_dispatch(struct client *);
 void	server_client_msg_command(struct client *, struct imsg *);
 void	server_client_msg_identify(struct client *, struct imsg *);
 void	server_client_msg_shell(struct client *);
+
+/* Check if this client is inside this server. */
+int
+server_client_check_nested(struct client *c)
+{
+	struct environ_entry	*envent;
+	struct window_pane	*wp;
+
+	if (c->tty.path == NULL)
+		return (0);
+
+	envent = environ_find(&c->environ, "TMUX");
+	if (envent == NULL || *envent->value == '\0')
+		return (0);
+
+	RB_FOREACH(wp, window_pane_tree, &all_window_panes) {
+		if (strcmp(wp->tty, c->tty.path) == 0)
+			return (1);
+	}
+	return (0);
+}
 
 /* Set client key table. */
 void
@@ -63,7 +85,7 @@ server_client_create(int fd)
 	setblocking(fd, 0);
 
 	c = xcalloc(1, sizeof *c);
-	c->references = 0;
+	c->references = 1;
 	imsg_init(&c->ibuf, fd);
 	server_update_event(c);
 
@@ -72,6 +94,9 @@ server_client_create(int fd)
 	memcpy(&c->activity_time, &c->creation_time, sizeof c->activity_time);
 
 	environ_init(&c->environ);
+
+	c->fd = -1;
+	c->cwd = -1;
 
 	c->cmdq = cmdq_new(c);
 	c->cmdq->client_exit = 1;
@@ -139,6 +164,14 @@ server_client_lost(struct client *c)
 {
 	struct message_entry	*msg, *msg1;
 
+	c->flags |= CLIENT_DEAD;
+
+	status_prompt_clear(c);
+	status_message_clear(c);
+
+	if (c->stdin_callback != NULL)
+		c->stdin_callback(c, 1, c->stdin_callback_data);
+
 	TAILQ_REMOVE(&clients, c, entry);
 	log_debug("lost client %d", c->ibuf.fd);
 
@@ -156,8 +189,6 @@ server_client_lost(struct client *c)
 	if (c->stderr_data != c->stdout_data)
 		evbuffer_free(c->stderr_data);
 
-	status_free_jobs(&c->status_new);
-	status_free_jobs(&c->status_old);
 	screen_free(&c->status);
 
 	free(c->title);
@@ -193,14 +224,36 @@ server_client_lost(struct client *c)
 	if (event_initialized(&c->event))
 		event_del(&c->event);
 
-	TAILQ_INSERT_TAIL(&dead_clients, c, entry);
-	c->flags |= CLIENT_DEAD;
+	server_client_unref(c);
 
 	server_add_accept(0); /* may be more file descriptors now */
 
 	recalculate_sizes();
 	server_check_unattached();
 	server_update_socket();
+}
+
+/* Remove reference from a client. */
+void
+server_client_unref(struct client *c)
+{
+	log_debug("unref client %d (%d references)", c->ibuf.fd, c->references);
+
+	c->references--;
+	if (c->references == 0)
+		event_once(-1, EV_TIMEOUT, server_client_free, c, NULL);
+}
+
+/* Free dead client. */
+void
+server_client_free(unused int fd, unused short events, void *arg)
+{
+	struct client	*c = arg;
+
+	log_debug("free client %d (%d references)", c->ibuf.fd, c->references);
+
+	if (c->references == 0)
+		free(c);
 }
 
 /* Process a single client event. */
@@ -268,10 +321,8 @@ server_client_status_timer(void)
 		interval = options_get_number(&s->options, "status-interval");
 
 		difference = tv.tv_sec - c->status_timer.tv_sec;
-		if (interval != 0 && difference >= interval) {
-			status_update_jobs(c);
+		if (interval != 0 && difference >= interval)
 			c->flags |= CLIENT_STATUS;
-		}
 	}
 }
 
@@ -1005,6 +1056,7 @@ server_client_msg_dispatch(struct client *c)
 		case MSG_IDENTIFY_CWD:
 		case MSG_IDENTIFY_STDIN:
 		case MSG_IDENTIFY_ENVIRON:
+		case MSG_IDENTIFY_CLIENTPID:
 		case MSG_IDENTIFY_DONE:
 			server_client_msg_identify(c, &imsg);
 			break;
@@ -1179,6 +1231,11 @@ server_client_msg_identify(struct client *c, struct imsg *imsg)
 		if (strchr(data, '=') != NULL)
 			environ_put(&c->environ, data);
 		break;
+	case MSG_IDENTIFY_CLIENTPID:
+		if (datalen != sizeof c->pid)
+			fatalx("bad MSG_IDENTIFY_CLIENTPID size");
+		memcpy(&c->pid, data, sizeof c->pid);
+		break;
 	default:
 		break;
 	}
@@ -1213,12 +1270,11 @@ server_client_msg_identify(struct client *c, struct imsg *imsg)
 
 	if (c->fd == -1)
 		return;
-	if (!isatty(c->fd)) {
+	if (tty_init(&c->tty, c, c->fd, c->term) != 0) {
 		close(c->fd);
 		c->fd = -1;
 		return;
 	}
-	tty_init(&c->tty, c, c->fd, c->term);
 	if (c->flags & CLIENT_UTF8)
 		c->tty.flags |= TTY_UTF8;
 	if (c->flags & CLIENT_256COLOURS)

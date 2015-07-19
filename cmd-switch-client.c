@@ -31,8 +31,8 @@ enum cmd_retval	 cmd_switch_client_exec(struct cmd *, struct cmd_q *);
 
 const struct cmd_entry cmd_switch_client_entry = {
 	"switch-client", "switchc",
-	"lc:npt:rT:", 0, 0,
-	"[-lnpr] [-c target-client] [-t target-session] [-T key-table]",
+	"lc:Enpt:rT:", 0, 0,
+	"[-Elnpr] [-c target-client] [-t target-session] [-T key-table]",
 	CMD_READONLY,
 	cmd_switch_client_exec
 };
@@ -46,7 +46,7 @@ cmd_switch_client_exec(struct cmd *self, struct cmd_q *cmdq)
 	struct winlink		*wl = NULL;
 	struct window 		*w = NULL;
 	struct window_pane	*wp = NULL;
-	const char		*tflag, *tablename;
+	const char		*tflag, *tablename, *update;
 	struct key_table	*table;
 
 	if ((c = cmd_find_client(cmdq, args_get(args, 'c'), 0)) == NULL)
@@ -117,6 +117,11 @@ cmd_switch_client_exec(struct cmd *self, struct cmd_q *cmdq)
 				window_set_active_pane(wp->window, wp);
 			session_set_current(s, wl);
 		}
+	}
+
+	if (c != NULL && !args_has(args, 'E')) {
+		update = options_get_string(&s->options, "update-environment");
+		environ_update(update, &c->environ, &s->environ);
 	}
 
 	if (c->session != NULL)
