@@ -59,10 +59,13 @@ void	tty_default_colours(struct grid_cell *, const struct window_pane *);
 #define tty_pane_full_width(tty, ctx) \
 	((ctx)->xoff == 0 && screen_size_x((ctx)->wp->screen) >= (tty)->sx)
 
-void
+int
 tty_init(struct tty *tty, struct client *c, int fd, char *term)
 {
 	char	*path;
+
+	if (!isatty(fd))
+		return (-1);
 
 	memset(tty, 0, sizeof *tty);
 	tty->log_fd = -1;
@@ -75,13 +78,15 @@ tty_init(struct tty *tty, struct client *c, int fd, char *term)
 	tty->client = c;
 
 	if ((path = ttyname(fd)) == NULL)
-		fatalx("ttyname failed");
+		return (-1);
 	tty->path = xstrdup(path);
 	tty->cstyle = 0;
 	tty->ccolour = xstrdup("");
 
 	tty->flags = 0;
 	tty->term_flags = 0;
+
+	return (0);
 }
 
 int
@@ -507,14 +512,17 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 		mode &= ~MODE_CURSOR;
 
 	changed = mode ^ tty->mode;
-	if (changed & (MODE_CURSOR|MODE_BLINKING)) {
-		if (mode & MODE_CURSOR) {
-			if (mode & MODE_BLINKING &&
-			    tty_term_has(tty->term, TTYC_CVVIS))
-				tty_putcode(tty, TTYC_CVVIS);
-			else
-				tty_putcode(tty, TTYC_CNORM);
-		} else
+	if (changed & MODE_BLINKING) {
+		if (tty_term_has(tty->term, TTYC_CVVIS))
+			tty_putcode(tty, TTYC_CVVIS);
+		else
+			tty_putcode(tty, TTYC_CNORM);
+		changed |= MODE_CURSOR;
+	}
+	if (changed & MODE_CURSOR) {
+		if (mode & MODE_CURSOR)
+			tty_putcode(tty, TTYC_CNORM);
+		else
 			tty_putcode(tty, TTYC_CIVIS);
 	}
 	if (s != NULL && tty->cstyle != s->cstyle) {
@@ -723,9 +731,23 @@ tty_draw_line(struct tty *tty, const struct window_pane *wp,
 	tty_update_mode(tty, tty->mode, s);
 }
 
+int
+tty_client_ready(struct client *c, struct window_pane *wp)
+{
+	if (c->session == NULL || c->tty.term == NULL)
+		return (0);
+	if (c->flags & CLIENT_SUSPENDED)
+		return (0);
+	if (c->tty.flags & TTY_FREEZE)
+		return (0);
+	if (c->session->curw->window != wp->window)
+		return (0);
+	return (1);
+}
+
 void
-tty_write(
-    void (*cmdfn)(struct tty *, const struct tty_ctx *), struct tty_ctx *ctx)
+tty_write(void (*cmdfn)(struct tty *, const struct tty_ctx *),
+    struct tty_ctx *ctx)
 {
 	struct window_pane	*wp = ctx->wp;
 	struct client		*c;
@@ -740,13 +762,7 @@ tty_write(
 		return;
 
 	TAILQ_FOREACH(c, &clients, entry) {
-		if (c->session == NULL || c->tty.term == NULL)
-			continue;
-		if (c->flags & CLIENT_SUSPENDED)
-			continue;
-		if (c->tty.flags & TTY_FREEZE)
-			continue;
-		if (c->session->curw->window != wp->window)
+		if (!tty_client_ready(c, wp))
 			continue;
 
 		ctx->xoff = wp->xoff;

@@ -222,7 +222,7 @@ client_main(int argc, char **argv, int flags)
 		cmdflags = CMD_STARTSERVER;
 	} else if (argc == 0) {
 		msg = MSG_COMMAND;
-		cmdflags = CMD_STARTSERVER|CMD_CANTNEST;
+		cmdflags = CMD_STARTSERVER;
 	} else {
 		msg = MSG_COMMAND;
 
@@ -240,22 +240,8 @@ client_main(int argc, char **argv, int flags)
 		TAILQ_FOREACH(cmd, &cmdlist->list, qentry) {
 			if (cmd->entry->flags & CMD_STARTSERVER)
 				cmdflags |= CMD_STARTSERVER;
-			if (cmd->entry->flags & CMD_CANTNEST)
-				cmdflags |= CMD_CANTNEST;
 		}
 		cmd_list_free(cmdlist);
-	}
-
-	/*
-	 * Check if this could be a nested session, if the command can't nest:
-	 * if the socket path matches $TMUX, this is probably the same server.
-	 */
-	if (shell_cmd == NULL && environ_path != NULL &&
-	    (cmdflags & CMD_CANTNEST) &&
-	    strcmp(socket_path, environ_path) == 0) {
-		fprintf(stderr, "sessions should be nested with care, "
-		    "unset $TMUX to force\n");
-		return (1);
 	}
 
 	/* Establish signal handlers. */
@@ -366,9 +352,11 @@ client_main(int argc, char **argv, int flags)
 void
 client_send_identify(int flags)
 {
-	const char	*s;
+	const char	 *s;
 	char		**ss;
-	int		 fd;
+	size_t		  sslen;
+	int		  fd;
+	pid_t		  pid;
 
 	client_write_one(MSG_IDENTIFY_FLAGS, -1, &flags, sizeof flags);
 
@@ -388,8 +376,14 @@ client_send_identify(int flags)
 		fatal("dup failed");
 	client_write_one(MSG_IDENTIFY_STDIN, fd, NULL, 0);
 
-	for (ss = environ; *ss != NULL; ss++)
-		client_write_one(MSG_IDENTIFY_ENVIRON, -1, *ss, strlen(*ss) + 1);
+	pid = getpid();
+	client_write_one(MSG_IDENTIFY_CLIENTPID, -1, &pid, sizeof pid);
+
+	for (ss = environ; *ss != NULL; ss++) {
+		sslen = strlen(*ss) + 1;
+		if (sslen <= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+			client_write_one(MSG_IDENTIFY_ENVIRON, -1, *ss, sslen);
+	}
 
 	client_write_one(MSG_IDENTIFY_DONE, -1, NULL, 0);
 

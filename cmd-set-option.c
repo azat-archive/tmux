@@ -110,8 +110,11 @@ cmd_set_option_exec(struct cmd *self, struct cmd_q *cmdq)
 	/* Find the option entry, try each table. */
 	table = oe = NULL;
 	if (options_table_find(optstr, &table, &oe) != 0) {
-		cmdq_error(cmdq, "ambiguous option: %s", optstr);
-		return (CMD_RETURN_ERROR);
+		if (!args_has(args, 'q')) {
+			cmdq_error(cmdq, "ambiguous option: %s", optstr);
+			return (CMD_RETURN_ERROR);
+		}
+		return (CMD_RETURN_NORMAL);
 	}
 	if (oe == NULL) {
 		if (!args_has(args, 'q')) {
@@ -266,16 +269,25 @@ cmd_set_option_unset(struct cmd *self, struct cmd_q *cmdq,
 {
 	struct args	*args = self->args;
 
-	if (args_has(args, 'g')) {
-		cmdq_error(cmdq, "can't unset global option: %s", oe->name);
-		return (-1);
-	}
 	if (value != NULL) {
 		cmdq_error(cmdq, "value passed to unset option: %s", oe->name);
 		return (-1);
 	}
 
-	options_remove(oo, oe->name);
+	if (args_has(args, 'g') || oo == &global_options) {
+		switch (oe->type) {
+		case OPTIONS_TABLE_STRING:
+			options_set_string(oo, oe->name, "%s", oe->default_str);
+			break;
+		case OPTIONS_TABLE_STYLE:
+			options_set_style(oo, oe->name, oe->default_str, 0);
+			break;
+		default:
+			options_set_number(oo, oe->name, oe->default_num);
+			break;
+		}
+	} else
+		options_remove(oo, oe->name);
 	return (0);
 }
 

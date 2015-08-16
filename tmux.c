@@ -22,7 +22,6 @@
 #include <errno.h>
 #include <event.h>
 #include <fcntl.h>
-#include <getopt.h>
 #include <locale.h>
 #include <pwd.h>
 #include <stdlib.h>
@@ -61,7 +60,7 @@ __dead void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-2lquvV] [-c shell-command] [-f file] [-L socket-name]\n"
+	    "usage: %s [-2CluvV] [-c shell-command] [-f file] [-L socket-name]\n"
 	    "            [-S socket-path] [command [flags]]\n",
 	    __progname);
 	exit(1);
@@ -201,10 +200,27 @@ shell_exec(const char *shell, const char *shellcmd)
 	fatal("execl failed");
 }
 
+const char*
+find_home(void)
+{
+	struct passwd	*pw;
+	const char	*home;
+
+	home = getenv("HOME");
+	if (home == NULL || *home == '\0') {
+		pw = getpwuid(getuid());
+		if (pw != NULL)
+			home = pw->pw_dir;
+		else
+			home = NULL;
+	}
+
+	return home;
+}
+
 int
 main(int argc, char **argv)
 {
-	struct passwd	*pw;
 	char		*s, *path, *label, **var, tmp[PATH_MAX];
 	char		 in[256];
 	const char	*home;
@@ -326,14 +342,7 @@ main(int argc, char **argv)
 
 	/* Locate the configuration file. */
 	if (cfg_file == NULL) {
-		home = getenv("HOME");
-		if (home == NULL || *home == '\0') {
-			pw = getpwuid(getuid());
-			if (pw != NULL)
-				home = pw->pw_dir;
-			else
-				home = NULL;
-		}
+		home = find_home();
 		if (home != NULL) {
 			xasprintf(&cfg_file, "%s/.tmux.conf", home);
 			if (access(cfg_file, R_OK) != 0 && errno == ENOENT) {
