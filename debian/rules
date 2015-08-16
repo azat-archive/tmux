@@ -16,6 +16,16 @@ include /usr/share/dpkg/default.mk
 # package maintainers to append LDFLAGS
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
+# configure
+config.status: autogen.sh
+	./autogen.sh
+	cp -f /usr/share/misc/config.sub config.sub
+	cp -f /usr/share/misc/config.guess config.guess
+	dh_auto_configure
+build: build-stamp
+build-stamp: config.status
+	dh_testdir
+
 
 # main packaging script based on dh7 syntax
 %:
